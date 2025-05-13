@@ -51,17 +51,53 @@ jobs:
       - name: Install ccache
         run: choco install ccache -y
         shell: pwsh
+        
       # A newer version of cmake.install is usually on github alredy installed.
       #- name: Install CMake 3.21.0
       #  run: choco install cmake --version=3.21.0 -y
       #  shell: pwsh
       
-      - name: Install Boost
+      #- name: Install Boost
+      #  run: |
+      #    # Latest version Info on https://www.boost.org/releases/latest/
+      #    # load Boost
+      #    Invoke-WebRequest -Uri "https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.zip" -OutFile libBoost.zip
+      #    # Extract to C:\tools\libBoost
+      #    Expand-Archive libBoost.zip -DestinationPath C:\tools\libBoost -Force
+      #    # Add Toolchain to PATH envirment variable
+      #    Add-Content -Path $env:BOOST_ROOT -Value "C:\tools\libBoost\tools\boost"
+      #  shell: pwsh
+      
+      - name: Create vcpkg manifest file
         run: |
-          Write-Host "Installing Boost with Chocolatey..."
-          choco install boost -y
-          # to alow boost env to be set in all folowing steps we write it into github env
-          echo "BOOST_ROOT=C:\ProgramData\chocolatey\lib\boost\tools\boost" >> $env:GITHUB_ENV
+          Write-Host "Creating vcpkg manifest file..."
+          @"
+          {
+            "name": "krita",
+            "dependencies": [
+              { "name": "boost", "version=": "1.65.0" }
+            ]
+          }
+          "@ | Set-Content -Encoding UTF8 vcpkg.json
+        shell: pwsh
+        
+      - name: Install Boost via vcpkg
+        run: |
+          Write-Host "Installing Boost with vcpkg..."
+          vcpkg install
+          #to use boost cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
+        shell: pwsh
+        
+      - name: Check if vcpkg.cmake exists
+        run: |
+          $vcpkgCMakePath = "$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
+          if (Test-Path $vcpkgCMakePath) {
+            Write-Host "vcpkg.cmake found: $vcpkgCMakePath"
+            Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_TOOLCHAIN_FILE=$vcpkgCMakePath"
+          }
+          else {
+            Write-Error "vcpkg.cmake not found in: $vcpkgCMakePath"
+          }
         shell: pwsh
         
       - name: Install LLVM MinGW Compiler Toolchain
