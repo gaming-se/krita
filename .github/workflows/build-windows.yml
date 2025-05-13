@@ -124,8 +124,10 @@ jobs:
           Compress-Archive -Path build-krita.log,build-installers.log -DestinationPath log.zip
         shell: pwsh
 
-      - name: Upload Logs as ZIP Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: log-zip
-          path: log.zip
+      #- name: Upload Logs as ZIP Artifact
+      #  uses: actions/upload-artifact@v3
+      #  with:
+      #    name: logZip
+      #    path: |
+      #      log.zip
+      #    retention-days: 1
