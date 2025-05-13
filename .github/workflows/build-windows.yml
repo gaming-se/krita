@@ -1,4 +1,7 @@
-name: Krita Windows Build
+name: build Windows
+
+permissions:
+  contents: read
 #based on     krita/build-tools/ci-scripts/windows.yml
 on:
   workflow_dispatch:  # Triger manual
@@ -28,6 +31,9 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+        with:
+          # deactivates persist of GitHub-Token in git-conf
+          persist-credentials: false
 
       - name: Setup Python 3.10
         uses: actions/setup-python@v4
@@ -37,10 +43,11 @@ jobs:
       - name: Install Ninja Build System
         run: choco install ninja -y
         shell: pwsh
-
-      - name: Install CMake 3.21.0
-        run: choco install cmake --version=3.21.0 -y
-        shell: pwsh
+      
+      # A newer version of cmake.install is usually on github alredy installed.
+      #- name: Install CMake 3.21.0
+      #  run: choco install cmake --version=3.21.0 -y
+      #  shell: pwsh
 
       - name: Install LLVM MinGW Compiler Toolchain
         run: |
