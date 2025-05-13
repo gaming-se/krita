@@ -34,6 +34,10 @@ jobs:
         with:
           # deactivates persist of GitHub-Token in git-conf
           persist-credentials: false
+          
+      - name: List current directory files
+        run: dir
+        shell: pwsh
 
       - name: Setup Python 3.10
         uses: actions/setup-python@v4
@@ -51,7 +55,15 @@ jobs:
       #- name: Install CMake 3.21.0
       #  run: choco install cmake --version=3.21.0 -y
       #  shell: pwsh
-
+      
+      - name: Install Boost
+        run: |
+          Write-Host "Installing Boost with Chocolatey..."
+          choco install boost -y
+          # to alow boost env to be set in all folowing steps we write it into github env
+          echo "BOOST_ROOT=C:\ProgramData\chocolatey\lib\boost\tools\boost" >> $env:GITHUB_ENV
+        shell: pwsh
+        
       - name: Install LLVM MinGW Compiler Toolchain
         run: |
           # load LLVM MinGW Toolchain
