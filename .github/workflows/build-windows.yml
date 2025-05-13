@@ -68,23 +68,24 @@ jobs:
       #    Add-Content -Path $env:BOOST_ROOT -Value "C:\tools\libBoost\tools\boost"
       #  shell: pwsh
       
-      - name: Create vcpkg manifest file
-        run: |
-          Write-Host "Creating vcpkg manifest file..."
-          @"
-          {
-            "name": "krita",
-            "dependencies": [
-              { "name": "boost", "version>=": "1.65.0" }
-            ]
-          }
-          "@ | Set-Content -Encoding UTF8 vcpkg.json
-        shell: pwsh
+      #- name: Create vcpkg manifest file
+      #  run: |
+      #    Write-Host "Creating vcpkg manifest file..."
+      #    @"
+      #    {
+      #      "name": "krita",
+      #      "dependencies": [
+      #        { "name": "boost", "version>=": "1.65.0" }
+      #      ]
+      #    }
+      #    "@ | Set-Content -Encoding UTF8 vcpkg.json
+      #  shell: pwsh
         
       - name: Install Boost via vcpkg
         run: |
           Write-Host "Installing Boost with vcpkg..."
-          vcpkg install
+          #vcpkg install
+          vcpkg install boost
           #to use boost cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
         shell: pwsh
         
