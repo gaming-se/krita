@@ -52,7 +52,7 @@ jobs:
       - name: Install LLVM MinGW Compiler Toolchain
         run: |
           # load LLVM MinGW Toolchain
-          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-ucrt.zip" -OutFile llvm-mingw.zip
+          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-ucrt-x86_64.zip" -OutFile llvm-mingw.zip
           # Extract to C:\tools\llvm-mingw
           Expand-Archive llvm-mingw.zip -DestinationPath C:\tools\llvm-mingw -Force
           # Add Toolchain to PATH envirment variable
