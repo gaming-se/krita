@@ -1,0 +1,127 @@
+name: Krita Windows Build
+#based on     krita/build-tools/ci-scripts/windows.yml
+on:
+  workflow_dispatch:  # Triger manual
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    env:
+      KDECI_BUILD_TYPE: Release
+      KDECI_CC_CACHE: C:\Gitlab\Caches\krita-windows
+      KDECI_CACHE_PATH: C:\Gitlab\Artifacts\krita-windows
+      KDECI_GITLAB_SERVER: https://invent.kde.org/
+      KDECI_PACKAGE_PROJECT: teams/ci-artifacts/krita-windows
+      KDECI_REPO_METADATA_PATH: ${{ github.workspace }}\krita-deps-management\repo-metadata
+      KDECI_COMPRESS_PACKAGES_ON_DOWNLOAD: False
+      KDECI_EXTRA_CMAKE_ARGS: -DHIDE_SAFE_ASSERTS=OFF
+      KRITACI_SKIP_DEBUG_PACKAGE: True
+      KRITACI_BUILD_INSTALLERS: False
+      KRITACI_SKIP_UPLOAD_NIGHTLY_PACKAGE: True
+      KRITACI_WINDOWS_SIGN_CONFIG: upstream-ci-utilities/signing/signwindowsbinaries.ini
+      KRITACI_PUBLISH_BUILD_CONFIG: upstream-ci-utilities/signing/publishbuild.ini
+      EFFECTIVE_DEPS_REPO_BRANCH_NAME: "master" 
+      EFFECTIVE_DEPS_BRANCH_NAME: "master"
+      CI_PROJECT_DIR: ${{ github.workspace }}
+      CI_PROJECT_NAME: ${{ github.repository }}
+      CI_COMMIT_REF_NAME: ${{ github.ref_name }}
+      
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Ninja Build System
+        run: choco install ninja -y
+        shell: pwsh
+
+      - name: Install CMake 3.21.0
+        run: choco install cmake --version=3.21.0 -y
+        shell: pwsh
+
+      - name: Install LLVM MinGW Compiler Toolchain
+        run: |
+          # load LLVM MinGW Toolchain
+          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-ucrt.zip" -OutFile llvm-mingw.zip
+          # Extract to C:\tools\llvm-mingw
+          Expand-Archive llvm-mingw.zip -DestinationPath C:\tools\llvm-mingw -Force
+          # Add Toolchain to PATH envirment variable
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\tools\llvm-mingw\llvm-mingw-20240619-ucrt\bin"
+        shell: pwsh
+        
+      - name: Clone krita-deps-management
+        run: git clone https://invent.kde.org/packaging/krita-deps-management.git -b $env:EFFECTIVE_DEPS_REPO_BRANCH_NAME --depth=1
+        shell: pwsh
+
+      - name: Clone krita-ci-utilities
+        run: git clone https://invent.kde.org/packaging/krita-ci-utilities.git krita-deps-management/ci-utilities --depth=1
+        shell: pwsh
+
+      - name: Clone ci-notary-service
+        run: git clone https://invent.kde.org/sysadmin/ci-notary-service.git --depth=1
+        shell: pwsh
+
+      - name: Clone upstream-ci-utilities
+        run: git clone https://invent.kde.org/sysadmin/ci-utilities.git upstream-ci-utilities --depth=1
+        shell: pwsh
+
+      - name: Set up Python virtual environment
+        run: |
+          python -m venv venv --upgrade-deps
+          .\venv\Scripts\Activate.ps1
+        shell: pwsh
+        
+      - name: Install Python Dependencies
+        run: |
+          .\venv\Scripts\Activate.ps1
+          pip install -r krita-deps-management/requirements.txt
+          pip install -r ci-notary-service/requirements.txt
+        shell: pwsh
+
+      #- name: Configure Git safe directory #dont think its needed for github autobuild 
+      #  run: git config --global --add safe.directory $env:CI_PROJECT_DIR
+      #  shell: pwsh
+
+      - name: Replace Branch in Seed File
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python -u krita-deps-management/tools/replace-branch-in-seed-file.py krita-deps-management/latest/krita-deps.yml -p -o branch-corrected-deps.yml -d $env:EFFECTIVE_DEPS_BRANCH_NAME
+        shell: pwsh
+
+      - name: Generate Deps File
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python -u krita-deps-management/tools/generate-deps-file.py -s branch-corrected-deps.yml -o .kde-ci.yml
+        shell: pwsh
+
+      - name: Run Krita CI Build
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python -u krita-deps-management/ci-utilities/run-ci-build.py --project $env:CI_PROJECT_NAME --branch $env:CI_COMMIT_REF_NAME --platform "Windows/Qt5/Shared" --skip-publishing 2>&1 | Tee-Object -FilePath "build-krita.log"
+        shell: pwsh
+
+      - name: Build Windows Package
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python -u build-tools/ci-scripts/build-windows-package.py 2>&1 | Tee-Object -FilePath "build-installers.log"
+        shell: pwsh
+      
+      #- name: Upload Nightly Packages
+      #  run: |
+      #    .\venv\Scripts\Activate.ps1
+      #    python -u build-tools/ci-scripts/upload-nightly-packages.py --platform windows --folder $env:CI_PROJECT_DIR 2>&1 | Tee-Object -FilePath "installers-publish.log"
+      #  shell: pwsh
+      
+      - name: Zip Logs
+        run: |
+          Compress-Archive -Path build-krita.log,build-installers.log -DestinationPath log.zip
+        shell: pwsh
+
+      - name: Upload Logs as ZIP Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: log-zip
+          path: log.zip
