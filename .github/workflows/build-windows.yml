@@ -75,7 +75,7 @@ jobs:
           {
             "name": "krita",
             "dependencies": [
-              { "name": "boost", "version": "1.65.0" }
+              { "name": "boost", "version==": "1.65.0" }
             ]
           }
           "@ | Set-Content -Encoding UTF8 vcpkg.json
