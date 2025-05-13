@@ -43,7 +43,10 @@ jobs:
       - name: Install Ninja Build System
         run: choco install ninja -y
         shell: pwsh
-      
+        
+      - name: Install ccache
+        run: choco install ccache -y
+        shell: pwsh
       # A newer version of cmake.install is usually on github alredy installed.
       #- name: Install CMake 3.21.0
       #  run: choco install cmake --version=3.21.0 -y
