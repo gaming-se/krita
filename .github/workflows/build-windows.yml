@@ -115,6 +115,10 @@ jobs:
       #    python -u build-tools/ci-scripts/upload-nightly-packages.py --platform windows --folder $env:CI_PROJECT_DIR 2>&1 | Tee-Object -FilePath "installers-publish.log"
       #  shell: pwsh
       
+      - name: List current directory files
+        run: dir
+        shell: pwsh
+        
       - name: Zip Logs
         run: |
           Compress-Archive -Path build-krita.log,build-installers.log -DestinationPath log.zip
