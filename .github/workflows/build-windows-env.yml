@@ -57,9 +57,9 @@ jobs:
       #    restore-keys: |
       #      chocolatey-${{ runner.os }}-
             
-      - name: Install Ninja Build System
-        run: choco install ninja -y
-        shell: pwsh
+      #- name: Install Ninja Build System
+      #  run: choco install ninja -y
+      #  shell: pwsh
         
       - name: Install ccache
         run: choco install ccache -y
@@ -96,7 +96,29 @@ jobs:
       - name: List current directory files in C:/vcpkg/
         run: dir C:/vcpkg/
         shell: pwsh
-        
+
+
+      - name: Cache vcpkg installed
+        uses: actions/cache@v3
+        with:
+          path: cache-vcpkg-installed
+          key: vcpkg-installed-${{ runner.os }}-test }}
+          restore-keys: |
+            vcpkg-installed-${{ runner.os }}-
+
+      - name: Create installed directory for vcpkg and Symlink vcpkg installed folder to it
+        shell: pwsh
+        run: |
+          if (!(Test-Path -Path "cache-vcpkg-installed")) {
+              New-Item -ItemType Directory -Force -Path "cache-vcpkg-installed" | Out-Null
+              Write-Host "Directory 'cache-vcpkg-installed' created"
+          } else {
+              Write-Host "Directory 'cache-vcpkg-installed' used from cache"
+          }
+          # creates symlink for vcpkg installed
+          New-Item -ItemType SymbolicLink -Path "C:\vcpkg\installed" -Target "$env:GITHUB_WORKSPACE\cache-vcpkg-installed" 
+            
+          
       - name: Cache vcpkg binaries
         uses: actions/cache@v3
         with:
@@ -110,13 +132,12 @@ jobs:
         run: |
           if (!(Test-Path -Path "cache-vcpkg-bin-source")) {
               New-Item -ItemType Directory -Force -Path "cache-vcpkg-bin-source" | Out-Null
-              Write-Host "Directory 'cache-vcpkg-bin-source' wurde erstellt."
+              Write-Host "Directory 'cache-vcpkg-bin-source' created"
           } else {
-              Write-Host "Directory 'cache-vcpkg-bin-source' existiert bereits."
+              Write-Host "Directory 'cache-vcpkg-bin-source' used from cache"
           }
           
       - name: Set VCPKG_BINARY_SOURCES
-      
         run: |
          echo "VCPKG_BINARY_SOURCES=clear;files,$env:GITHUB_WORKSPACE\cache-vcpkg-bin-source,readwrite"
          echo "VCPKG_BINARY_SOURCES=clear;files,$env:GITHUB_WORKSPACE\cache-vcpkg-bin-source,readwrite" >> $env:GITHUB_ENV
@@ -139,9 +160,9 @@ jobs:
         run: |
           if (!(Test-Path -Path "cache-vcpkg-downloads")) {
               New-Item -ItemType Directory -Force -Path "cache-vcpkg-downloads" | Out-Null
-              Write-Host "Directory 'cache-vcpkg-downloads' wurde erstellt."
+              Write-Host "Directory 'cache-vcpkg-downloads' created"
           } else {
-              Write-Host "Directory 'cache-vcpkg-downloads' existiert bereits."
+              Write-Host "Directory 'cache-vcpkg-downloads' used from cache"
           }
           # creates symlink for vcpkg downloads
           New-Item -ItemType SymbolicLink -Path "C:\vcpkg\downloads" -Target "$env:GITHUB_WORKSPACE\cache-vcpkg-downloads" 
@@ -149,11 +170,11 @@ jobs:
                    
           
       #--only-downloads --dry-run for testing or precreating cache
-      - name: Install Boost via vcpkg
+      - name: Install Boost-core via vcpkg
         run: |
-          Write-Host "Installing Boost with vcpkg..."
+          Write-Host "Installing Boost-core with vcpkg..."
           #vcpkg install
-          vcpkg install boost
+          vcpkg install boost-core
           #to use boost cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
         shell: pwsh
         
