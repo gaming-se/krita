@@ -131,7 +131,7 @@ jobs:
         run: |
           Write-Host "Installing Boost with vcpkg..."
           #vcpkg install
-          vcpkg install boost --dry-run
+          vcpkg install boost --only-downloads
           #to use boost cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
         shell: pwsh
         
