@@ -81,6 +81,14 @@ jobs:
       #    "@ | Set-Content -Encoding UTF8 vcpkg.json
       #  shell: pwsh
         
+      - name: Cache vcpkg
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.VCPKG_INSTALLATION_ROOT }}/installed
+          key: vcpkg-${{ runner.os }}-boost }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}
+            
       - name: Install Boost via vcpkg
         run: |
           Write-Host "Installing Boost with vcpkg..."
@@ -138,6 +146,8 @@ jobs:
           .\venv\Scripts\Activate.ps1
           pip install -r krita-deps-management/requirements.txt
           pip install -r ci-notary-service/requirements.txt
+          pip install packaging
+          pip install sip sipbuild
         shell: pwsh
 
       #- name: Configure Git safe directory #dont think its needed for github autobuild 
@@ -190,3 +200,20 @@ jobs:
       #    path: |
       #      log.zip
       #    retention-days: 1
+
+      - name: Check vcpkg Cache Size
+        run: |
+          $cachePath = "$env:VCPKG_INSTALLATION_ROOT\installed"
+          if (Test-Path $cachePath) {
+              $size = (Get-ChildItem -Path $cachePath -Recurse | Measure-Object -Property Length -Sum).Sum / 1GB
+              Write-Host "Cache-Size: $size GB"
+              
+              if ($size -gt 5) {
+                  Write-Host "warning cache bigger then 5gb aboard of workflow"
+                  #maybe at some time. curl -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/<owner>/<repo>/actions/caches/<cache_id>"
+                  exit 1
+              }
+          } else {
+              Write-Host "Fehler: Cache path dont exist"
+          }
+        shell: pwsh
