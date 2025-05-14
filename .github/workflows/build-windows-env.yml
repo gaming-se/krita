@@ -127,7 +127,7 @@ jobs:
         shell: pwsh
         
       #--only-downloads --dry-run for testing or precreating cache
-      - name: Install Boost via vcpkg --dry-run
+      - name: Install Boost via vcpkg --only-downloads
         run: |
           Write-Host "Installing Boost with vcpkg..."
           #vcpkg install
