@@ -170,11 +170,11 @@ jobs:
                    
           
       #--only-downloads --dry-run for testing or precreating cache
-      - name: Install Boost-core via vcpkg
+      - name: Install Boost via vcpkg
         run: |
-          Write-Host "Installing Boost-core with vcpkg..."
+          Write-Host "Installing Boost via vcpkg..."
           #vcpkg install
-          vcpkg install boost-core
+          vcpkg install boost
           #to use boost cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
         shell: pwsh
         
