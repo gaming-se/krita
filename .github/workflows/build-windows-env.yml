@@ -8,6 +8,7 @@ on:
 jobs:
   build-env-windows:
     runs-on: windows-latest
+    timeout-minutes: 90
     env:
       KDECI_BUILD_TYPE: Release
       KDECI_CC_CACHE: C:\Gitlab\Caches\krita-windows
