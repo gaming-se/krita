@@ -1,0 +1,118 @@
+name: build env Windows
+
+permissions:
+  contents: read
+#based on     krita/build-tools/ci-scripts/windows.yml
+on:
+  workflow_dispatch:  # Triger manual
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    env:
+      KDECI_BUILD_TYPE: Release
+      KDECI_CC_CACHE: C:\Gitlab\Caches\krita-windows
+      KDECI_CACHE_PATH: C:\Gitlab\Artifacts\krita-windows
+      KDECI_GITLAB_SERVER: https://invent.kde.org/
+      KDECI_PACKAGE_PROJECT: teams/ci-artifacts/krita-windows
+      KDECI_REPO_METADATA_PATH: ${{ github.workspace }}\krita-deps-management\repo-metadata
+      KDECI_COMPRESS_PACKAGES_ON_DOWNLOAD: False
+      KDECI_EXTRA_CMAKE_ARGS: -DHIDE_SAFE_ASSERTS=OFF
+      KRITACI_SKIP_DEBUG_PACKAGE: True
+      KRITACI_BUILD_INSTALLERS: False
+      KRITACI_SKIP_UPLOAD_NIGHTLY_PACKAGE: True
+      KRITACI_WINDOWS_SIGN_CONFIG: upstream-ci-utilities/signing/signwindowsbinaries.ini
+      KRITACI_PUBLISH_BUILD_CONFIG: upstream-ci-utilities/signing/publishbuild.ini
+      EFFECTIVE_DEPS_REPO_BRANCH_NAME: "master" 
+      EFFECTIVE_DEPS_BRANCH_NAME: "master"
+      CI_PROJECT_DIR: ${{ github.workspace }}
+      CI_PROJECT_NAME: ${{ github.repository }}
+      CI_COMMIT_REF_NAME: ${{ github.ref_name }}
+      
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          # deactivates persist of GitHub-Token in git-conf
+          persist-credentials: false
+          
+      - name: List current directory files
+        run: dir
+        shell: pwsh
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Cache Chocolatey packages
+        uses: actions/cache@v3
+        with:
+          path: C:/ProgramData/Chocolatey
+          key: chocolatey-${{ runner.os }}-ninja-ccache }}
+          restore-keys: |
+            chocolatey-${{ runner.os }}-
+            
+      - name: Install Ninja Build System
+        run: choco install ninja -y
+        shell: pwsh
+        
+      - name: Install ccache
+        run: choco install ccache -y
+        shell: pwsh
+        
+      # A newer version of cmake.install is usually on github alredy installed.
+      #- name: Install CMake 3.21.0
+      #  run: choco install cmake --version=3.21.0 -y
+      #  shell: pwsh
+      
+      #- name: Install Boost
+      #  run: |
+      #    # Latest version Info on https://www.boost.org/releases/latest/
+      #    # load Boost
+      #    Invoke-WebRequest -Uri "https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.zip" -OutFile libBoost.zip
+      #    # Extract to C:\tools\libBoost
+      #    Expand-Archive libBoost.zip -DestinationPath C:\tools\libBoost -Force
+      #    # Add Toolchain to PATH envirment variable
+      #    Add-Content -Path $env:BOOST_ROOT -Value "C:\tools\libBoost\tools\boost"
+      #  shell: pwsh
+      
+      #- name: Create vcpkg manifest file
+      #  run: |
+      #    Write-Host "Creating vcpkg manifest file..."
+      #    @"
+      #    {
+      #      "name": "krita",
+      #      "dependencies": [
+      #        { "name": "boost", "version>=": "1.65.0" }
+      #      ]
+      #    }
+      #    "@ | Set-Content -Encoding UTF8 vcpkg.json
+      #  shell: pwsh
+        
+      - name: Cache vcpkg
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.VCPKG_INSTALLATION_ROOT }}/installed
+          key: vcpkg-${{ runner.os }}-boost }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}
+            
+      - name: Install Boost via vcpkg
+        run: |
+          Write-Host "Installing Boost with vcpkg..."
+          #vcpkg install
+          vcpkg install boost
+          #to use boost cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
+        shell: pwsh
+        
+      - name: Check if vcpkg.cmake exists
+        run: |
+          $vcpkgCMakePath = "$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
+          if (Test-Path $vcpkgCMakePath) {
+            Write-Host "vcpkg.cmake found: $vcpkgCMakePath"
+            Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_TOOLCHAIN_FILE=$vcpkgCMakePath"
+          }
+          else {
+            Write-Error "vcpkg.cmake not found in: $vcpkgCMakePath"
+          }
+        shell: pwsh
