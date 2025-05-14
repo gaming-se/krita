@@ -149,11 +149,11 @@ jobs:
                    
           
       #--only-downloads --dry-run for testing or precreating cache
-      - name: Install Boost via vcpkg --only-downloads
+      - name: Install Boost via vcpkg
         run: |
           Write-Host "Installing Boost with vcpkg..."
           #vcpkg install
-          vcpkg install boost --only-downloads
+          vcpkg install boost
           #to use boost cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
         shell: pwsh
         
@@ -168,4 +168,3 @@ jobs:
             Write-Error "vcpkg.cmake not found in: $vcpkgCMakePath"
           }
         shell: pwsh
-        
