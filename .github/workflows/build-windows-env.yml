@@ -94,7 +94,7 @@ jobs:
       #    "@ | Set-Content -Encoding UTF8 vcpkg.json
       #  shell: pwsh
       - name: List current directory files in ${{ env.VCPKG_INSTALLATION_ROOT }}
-        run: dir ${{ env.VCPKG_INSTALLATION_ROOT }}
+        run: dir C:/vcpkg/installed
         shell: pwsh
         
       - name: Cache vcpkg installed
@@ -107,7 +107,7 @@ jobs:
       - name: Cache vcpkg Downloads  
         uses: actions/cache@v3
         with:
-          path: ${{ env.VCPKG_INSTALLATION_ROOT }}/downloads
+          path: C:/vcpkg/downloads
           key: vcpkg-${{ runner.os }}-downloads }}
           restore-keys: |
             vcpkg-${{ runner.os }}
