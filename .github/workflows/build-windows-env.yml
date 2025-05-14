@@ -97,20 +97,32 @@ jobs:
         run: dir C:/vcpkg/
         shell: pwsh
         
-      - name: Cache vcpkg installed
+      - name: Cache vcpkg binaries
         uses: actions/cache@v3
         with:
-          path: ${{ env.VCPKG_INSTALLATION_ROOT }}/installed
-          key: vcpkg-${{ runner.os }}-installed }}
+          path: cache-vcpkg-bin-source
+          key: vcpkg-${{ runner.os }}-vcpkgbinsource }}
           restore-keys: |
-            vcpkg-${{ runner.os }}
-      - name: Cache vcpkg Downloads  
-        uses: actions/cache@v3
-        with:
-          path: C:/vcpkg/downloads
-          key: vcpkg-${{ runner.os }}-downloads }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}
+            vcpkg-${{ runner.os }}-
+
+      - name: Create cache directory for vcpkg binary sources
+        shell: pwsh
+        run: |
+          if (!(Test-Path -Path "cache-vcpkg-bin-source")) {
+              New-Item -ItemType Directory -Force -Path "cache-vcpkg-bin-source" | Out-Null
+              Write-Host "Directory 'cache-vcpkg-bin-source' wurde erstellt."
+          } else {
+              Write-Host "Directory 'cache-vcpkg-bin-source' existiert bereits."
+          }
+          
+      - name: Set VCPKG_BINARY_SOURCES
+        run: echo "VCPKG_BINARY_SOURCES=clear;nuget,cache-vcpkg-bin-source" >> $GITHUB_ENV
+        shell: pwsh
+        
+      - name: vcpkg list 
+        run: vcpkg list 
+        shell: pwsh
+        
       #--only-downloads --dry-run for testing or precreating cache
       - name: Install Boost via vcpkg --dry-run
         run: |
@@ -135,3 +147,8 @@ jobs:
       - name: List current directory files in C:/vcpkg/
         run: dir C:/vcpkg/
         shell: pwsh
+
+      - name: List current directory files in C:/vcpkg/packages/
+        run: dir C:/vcpkg/packages/
+        shell: pwsh
+        
