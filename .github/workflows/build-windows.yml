@@ -148,6 +148,7 @@ jobs:
           pip install -r ci-notary-service/requirements.txt
           pip install packaging
           pip install sip sipbuild
+          pip install PyQt5
         shell: pwsh
 
       #- name: Configure Git safe directory #dont think its needed for github autobuild 
@@ -208,8 +209,8 @@ jobs:
               $size = (Get-ChildItem -Path $cachePath -Recurse | Measure-Object -Property Length -Sum).Sum / 1GB
               Write-Host "Cache-Size: $size GB"
               
-              if ($size -gt 5) {
-                  Write-Host "warning cache bigger then 5gb aboard of workflow"
+              if ($size -gt 7) {
+                  Write-Host "warning cache bigger then 7gb aboard of workflow"
                   #maybe at some time. curl -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/<owner>/<repo>/actions/caches/<cache_id>"
                   exit 1
               }
