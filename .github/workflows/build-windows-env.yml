@@ -147,11 +147,3 @@ jobs:
           }
         shell: pwsh
         
-      - name: List current directory files in C:/vcpkg/
-        run: dir C:/vcpkg/
-        shell: pwsh
-
-      - name: List current directory files in C:/vcpkg/packages/
-        run: dir C:/vcpkg/packages/
-        shell: pwsh
-        
