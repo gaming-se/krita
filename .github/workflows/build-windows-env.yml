@@ -118,8 +118,8 @@ jobs:
       - name: Set VCPKG_BINARY_SOURCES
       
         run: |
-         echo "VCPKG_BINARY_SOURCES=clear,files,$env:GITHUB_WORKSPACE\cache-vcpkg-bin-source,readwrite"
-         echo "VCPKG_BINARY_SOURCES=clear,files,$env:GITHUB_WORKSPACE\cache-vcpkg-bin-source,readwrite" >> $env:GITHUB_ENV
+         echo "VCPKG_BINARY_SOURCES=clear;files,$env:GITHUB_WORKSPACE\cache-vcpkg-bin-source,readwrite"
+         echo "VCPKG_BINARY_SOURCES=clear;files,$env:GITHUB_WORKSPACE\cache-vcpkg-bin-source,readwrite" >> $env:GITHUB_ENV
         shell: pwsh
         
       - name: vcpkg list 
