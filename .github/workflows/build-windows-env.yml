@@ -101,9 +101,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: cache-vcpkg-bin-source
-          key: vcpkg-${{ runner.os }}-vcpkgbinsource }}
+          key: vcpkg-vcpkgbinsource-${{ runner.os }}-test }}
           restore-keys: |
-            vcpkg-${{ runner.os }}-
+            vcpkg-vcpkgbinsource-${{ runner.os }}-
 
       - name: Create cache directory for vcpkg binary sources
         shell: pwsh
@@ -125,7 +125,29 @@ jobs:
       - name: vcpkg list 
         run: vcpkg list 
         shell: pwsh
-        
+
+      - name: Cache vcpkg downloads
+        uses: actions/cache@v3
+        with:
+          path: cache-vcpkg-downloads
+          key: vcpkg-downloads-${{ runner.os }}-test }}
+          restore-keys: |
+            vcpkg-downloads-${{ runner.os }}-
+            
+      - name: Create downloads directory for vcpkg and Symlink vcpkg Downloads to it
+        shell: pwsh
+        run: |
+          if (!(Test-Path -Path "cache-vcpkg-downloads")) {
+              New-Item -ItemType Directory -Force -Path "cache-vcpkg-downloads" | Out-Null
+              Write-Host "Directory 'cache-vcpkg-downloads' wurde erstellt."
+          } else {
+              Write-Host "Directory 'cache-vcpkg-downloads' existiert bereits."
+          }
+          # creates symlink for vcpkg downloads
+          New-Item -ItemType SymbolicLink -Path "C:\vcpkg\downloads" -Target "$env:GITHUB_WORKSPACE\cache-vcpkg-downloads" 
+          Write-Host "created: $env:GITHUB_WORKSPACE\cache-vcpkg-downloads -> C:\vcpkg\downloads"
+                   
+          
       #--only-downloads --dry-run for testing or precreating cache
       - name: Install Boost via vcpkg --only-downloads
         run: |
