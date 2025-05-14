@@ -93,8 +93,8 @@ jobs:
       #    }
       #    "@ | Set-Content -Encoding UTF8 vcpkg.json
       #  shell: pwsh
-      - name: List current directory files in ${{ env.VCPKG_INSTALLATION_ROOT }}
-        run: dir C:/vcpkg/installed
+      - name: List current directory files in C:/vcpkg/
+        run: dir C:/vcpkg/
         shell: pwsh
         
       - name: Cache vcpkg installed
@@ -130,4 +130,8 @@ jobs:
           else {
             Write-Error "vcpkg.cmake not found in: $vcpkgCMakePath"
           }
+        shell: pwsh
+        
+      - name: List current directory files in C:/vcpkg/
+        run: dir C:/vcpkg/
         shell: pwsh
