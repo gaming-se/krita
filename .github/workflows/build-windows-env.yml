@@ -47,7 +47,7 @@ jobs:
           #For pip, the action will cache the global cache directory
           #For pipenv, the action will cache virtualenv directory
           #For poetry, the action will cache virtualenv directories -- one for each poetry project found
-          cache: 'pipenv'
+          #cache: 'pipenv'
           
       #- name: Cache Chocolatey packages
       #  uses: actions/cache@v3
@@ -111,7 +111,7 @@ jobs:
           key: vcpkg-${{ runner.os }}-downloads }}
           restore-keys: |
             vcpkg-${{ runner.os }}
-        
+      #--only-downloads --dry-run for testing or precreating cache
       - name: Install Boost via vcpkg --dry-run
         run: |
           Write-Host "Installing Boost with vcpkg..."
