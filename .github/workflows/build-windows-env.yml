@@ -206,23 +206,54 @@ jobs:
             Write-Error "vcpkg.cmake not found in: $vcpkgCMakePath"
           }
         shell: pwsh
-
         
-      - name: Install LLVM MinGW Compiler Toolchain
+      # Restore the cached LLVM toolchain (if available)
+      - name: Restore LLVM MinGW cache
+        id: restore-llvm
+        uses: actions/cache@v3
+        with:
+          path: ${{ github.workspace }}\cache-llvm-mingw
+          key: windows-llvm-mingw-20240619
+
+      # Setup LLVM MinGW Toolchain
+      - name: Setup LLVM MinGW Toolchain
         run: |
-          # load LLVM MinGW Toolchain
-          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-ucrt-x86_64.zip" -OutFile llvm-mingw.zip
-          # Extract to C:\tools\llvm-mingw
-          Expand-Archive llvm-mingw.zip -DestinationPath C:\tools\llvm-mingw -Force
-          # Add Toolchain to PATH envirment variable
+          # If the cache folder doesn't exist, download and extract the toolchain
+          if (-Not (Test-Path -Path "${env:GITHUB_WORKSPACE}\cache-llvm-mingw")) {
+            Write-Host "Cache not found. Downloading LLVM MinGW Toolchain..."
+            Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-ucrt-x86_64.zip" -OutFile llvm-mingw.zip
+            Expand-Archive llvm-mingw.zip -DestinationPath "${env:GITHUB_WORKSPACE}\cache-llvm-mingw" -Force
+          }
+          else {
+            Write-Host "Using cached LLVM MinGW Toolchain."
+          }
+          
+          # Remove any existing toolchain directory at C:\tools\llvm-mingw
+          if (Test-Path "C:\tools\llvm-mingw") {
+            Remove-Item "C:\tools\llvm-mingw" -Recurse -Force
+          }
+          
+          # Create a symlink at C:\tools\llvm-mingw that points to the cache folder
+          New-Item -ItemType SymbolicLink -Path "C:\tools\llvm-mingw" -Target "${env:GITHUB_WORKSPACE}\cache-llvm-mingw"
+          
+          # Set the LLVM toolchain path and output it to the GitHub PATH file so it is added to the environment
           $llvmPath = "C:\tools\llvm-mingw\llvm-mingw-20240619-ucrt-x86_64\bin\"
           if (Test-Path $llvmPath) {
-            Write-Host "llvm path: $llvmPath"
-          } else {
-            Write-Error "llvm path _NOT_ found: $llvmPath"
+            Write-Host "LLVM path: $llvmPath"
           }
-          Add-Content -Path $env:GITHUB_PATH -Value "$llvmPath"
+          else {
+            Write-Error "LLVM path not found: $llvmPath"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $llvmPath
         shell: pwsh
+
+      # Save (update) the LLVM toolchain cache even if previous steps fail.
+      - name: Save LLVM MinGW cache
+        if: always()
+        uses: actions/cache@v3
+        with:
+          path: ${{ github.workspace }}\cache-llvm-mingw
+          key: windows-llvm-mingw-20240619
         
       # === packaging_krita-deps-management ===
       - name: Get commit hash for packaging_krita-deps-management
