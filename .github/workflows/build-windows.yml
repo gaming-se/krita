@@ -201,9 +201,9 @@ jobs:
           # Add Toolchain to PATH envirment variable
           $llvmPath = "C:\tools\llvm-mingw\llvm-mingw-20240619-ucrt-x86_64\bin\"
           if (Test-Path $llvmPath) {
-            Write-Error "llvm path: $llvmPath"
+            Write-Host "llvm path: $llvmPath"
           } else {
-            Write-Error "llvm NOT found in: $llvmPath"
+            Write-Error "llvm path _NOT_ found: $llvmPath"
           }
           Add-Content -Path $env:GITHUB_PATH -Value "$llvmPath"
         shell: pwsh
