@@ -1,4 +1,4 @@
-name: build Windows
+name: build env Windows
 
 permissions:
   contents: read
@@ -6,8 +6,9 @@ permissions:
 on:
   workflow_dispatch:  # Triger manual
 jobs:
-  windows-build:
+  build-env-windows:
     runs-on: windows-latest
+    timeout-minutes: 90
     env:
       KDECI_BUILD_TYPE: Release
       KDECI_CC_CACHE: C:\Gitlab\Caches\krita-windows
@@ -43,10 +44,23 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      - name: Install Ninja Build System
-        run: choco install ninja -y
-        shell: pwsh
+          #CacheTypes:
+          #For pip, the action will cache the global cache directory
+          #For pipenv, the action will cache virtualenv directory
+          #For poetry, the action will cache virtualenv directories -- one for each poetry project found
+          #cache: 'pipenv'
+          
+      #- name: Cache Chocolatey packages
+      #  uses: actions/cache@v3
+      #  with:
+      #    path: C:/ProgramData/Chocolatey
+      #    key: chocolatey-${{ runner.os }}-ninja-ccache }}
+      #    restore-keys: |
+      #      chocolatey-${{ runner.os }}-
+            
+      #- name: Install Ninja Build System
+      #  run: choco install ninja -y
+      #  shell: pwsh
         
       - name: Install ccache
         run: choco install ccache -y
@@ -80,18 +94,86 @@ jobs:
       #    }
       #    "@ | Set-Content -Encoding UTF8 vcpkg.json
       #  shell: pwsh
-        
-      - name: Cache vcpkg
+      - name: List current directory files in C:/vcpkg/
+        run: dir C:/vcpkg/
+        shell: pwsh
+
+
+      - name: Cache vcpkg installed
         uses: actions/cache@v3
         with:
-          path: ${{ env.VCPKG_INSTALLATION_ROOT }}/installed
-          key: vcpkg-${{ runner.os }}-boost }}
+          path: cache-vcpkg-installed
+          key: vcpkg-installed-${{ runner.os }}-test }}
           restore-keys: |
-            vcpkg-${{ runner.os }}
+            vcpkg-installed-${{ runner.os }}-
+
+      - name: Create installed directory for vcpkg and Symlink vcpkg installed folder to it
+        shell: pwsh
+        run: |
+          if (!(Test-Path -Path "cache-vcpkg-installed")) {
+              New-Item -ItemType Directory -Force -Path "cache-vcpkg-installed" | Out-Null
+              Write-Host "Directory 'cache-vcpkg-installed' created"
+          } else {
+              Write-Host "Directory 'cache-vcpkg-installed' used from cache"
+          }
+          # creates symlink for vcpkg installed
+          New-Item -ItemType SymbolicLink -Path "C:\vcpkg\installed" -Target "$env:GITHUB_WORKSPACE\cache-vcpkg-installed" 
             
+          
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v3
+        with:
+          path: cache-vcpkg-bin-source
+          key: vcpkg-vcpkgbinsource-${{ runner.os }}-test }}
+          restore-keys: |
+            vcpkg-vcpkgbinsource-${{ runner.os }}-
+
+      - name: Create cache directory for vcpkg binary sources
+        shell: pwsh
+        run: |
+          if (!(Test-Path -Path "cache-vcpkg-bin-source")) {
+              New-Item -ItemType Directory -Force -Path "cache-vcpkg-bin-source" | Out-Null
+              Write-Host "Directory 'cache-vcpkg-bin-source' created"
+          } else {
+              Write-Host "Directory 'cache-vcpkg-bin-source' used from cache"
+          }
+          
+      - name: Set VCPKG_BINARY_SOURCES
+        run: |
+         echo "VCPKG_BINARY_SOURCES=clear;files,$env:GITHUB_WORKSPACE\cache-vcpkg-bin-source,readwrite"
+         echo "VCPKG_BINARY_SOURCES=clear;files,$env:GITHUB_WORKSPACE\cache-vcpkg-bin-source,readwrite" >> $env:GITHUB_ENV
+        shell: pwsh
+        
+      - name: vcpkg list 
+        run: vcpkg list 
+        shell: pwsh
+
+      - name: Cache vcpkg downloads
+        uses: actions/cache@v3
+        with:
+          path: cache-vcpkg-downloads
+          key: vcpkg-downloads-${{ runner.os }}-test }}
+          restore-keys: |
+            vcpkg-downloads-${{ runner.os }}-
+            
+      - name: Create downloads directory for vcpkg and Symlink vcpkg Downloads to it
+        shell: pwsh
+        run: |
+          if (!(Test-Path -Path "cache-vcpkg-downloads")) {
+              New-Item -ItemType Directory -Force -Path "cache-vcpkg-downloads" | Out-Null
+              Write-Host "Directory 'cache-vcpkg-downloads' created"
+          } else {
+              Write-Host "Directory 'cache-vcpkg-downloads' used from cache"
+          }
+          # creates symlink for vcpkg downloads
+          New-Item -ItemType SymbolicLink -Path "C:\vcpkg\downloads" -Target "$env:GITHUB_WORKSPACE\cache-vcpkg-downloads" 
+          Write-Host "created: $env:GITHUB_WORKSPACE\cache-vcpkg-downloads -> C:\vcpkg\downloads"
+                   
+          
+      #--only-downloads --dry-run for testing or precreating cache
       - name: Install Boost via vcpkg
         run: |
-          Write-Host "Installing Boost with vcpkg..."
+          Write-Host "Installing Boost via vcpkg..."
           #vcpkg install
           vcpkg install boost
           #to use boost cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
@@ -108,6 +190,7 @@ jobs:
             Write-Error "vcpkg.cmake not found in: $vcpkgCMakePath"
           }
         shell: pwsh
+
         
       - name: Install LLVM MinGW Compiler Toolchain
         run: |
