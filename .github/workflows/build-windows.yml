@@ -199,24 +199,174 @@ jobs:
           # Extract to C:\tools\llvm-mingw
           Expand-Archive llvm-mingw.zip -DestinationPath C:\tools\llvm-mingw -Force
           # Add Toolchain to PATH envirment variable
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\tools\llvm-mingw\llvm-mingw-20240619-ucrt\bin"
+          $llvmPath = "C:\tools\llvm-mingw\llvm-mingw-20240619-ucrt-x86_64\bin\"
+          if (Test-Path $llvmPath) {
+            Write-Error "llvm path: $llvmPath"
+          } else {
+            Write-Error "llvm NOT found in: $llvmPath"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value "$llvmPath"
         shell: pwsh
         
-      - name: Clone krita-deps-management
-        run: git clone https://invent.kde.org/packaging/krita-deps-management.git -b $env:EFFECTIVE_DEPS_REPO_BRANCH_NAME --depth=1
+      # === packaging_krita-deps-management ===
+      - name: Get commit hash for packaging_krita-deps-management
+        id: packaging_krita-deps-management_hash
         shell: pwsh
+        run: |
+          # Retrieve the latest commit hash from the packaging/krita-deps-management repository
+          $commitLine = git ls-remote https://invent.kde.org/packaging/krita-deps-management.git $env:EFFECTIVE_DEPS_REPO_BRANCH_NAME | Select-Object -First 1
+          $commit = $commitLine.Split(" ")[0]
+          echo "commit=$commit" >> $env:GITHUB_OUTPUT
 
-      - name: Clone krita-ci-utilities
-        run: git clone https://invent.kde.org/packaging/krita-ci-utilities.git krita-deps-management/ci-utilities --depth=1
-        shell: pwsh
+      - name: Cache packaging_krita-deps-management repository
+        id: cache_packaging_krita-deps-management
+        uses: actions/cache@v3
+        with:
+          path: krita-deps-management
+          key: packaging_krita-deps-management-${{ env.EFFECTIVE_DEPS_REPO_BRANCH_NAME }}-${{ steps.packaging_krita-deps-management_hash.outputs.commit }}
 
-      - name: Clone ci-notary-service
-        run: git clone https://invent.kde.org/sysadmin/ci-notary-service.git --depth=1
+      - name: Clone packaging_krita-deps-management repository
+        if: steps.cache_packaging_krita-deps-management.outputs.cache-hit != 'true'
         shell: pwsh
+        run: |
+          # Clone the repository if no cache is found
+          git clone https://invent.kde.org/packaging/krita-deps-management.git -b $env:EFFECTIVE_DEPS_REPO_BRANCH_NAME --depth=1
 
-      - name: Clone upstream-ci-utilities
-        run: git clone https://invent.kde.org/sysadmin/ci-utilities.git upstream-ci-utilities --depth=1
+      - name: Update packaging_krita-deps-management repository if outdated
+        if: steps.cache_packaging_krita-deps-management.outputs.cache-hit == 'true'
         shell: pwsh
+        run: |
+          # Update the cached repository if the local commit differs from the remote
+          Set-Location -Path krita-deps-management
+          $local_commit = (git rev-parse HEAD).Trim()
+          $remote_commit = "${{ steps.packaging_krita-deps-management_hash.outputs.commit }}"
+          if ($local_commit -ne $remote_commit) {
+              Write-Output "Cached repository outdated. Fetching updates..."
+              git fetch --depth=1 origin $env:EFFECTIVE_DEPS_REPO_BRANCH_NAME
+              git reset --hard FETCH_HEAD
+          } else {
+              Write-Output "Repository is up-to-date."
+          }
+
+      # === packaging_krita-ci-utilities (located under krita-deps-management/ci-utilities) ===
+      - name: Get commit hash for packaging_krita-ci-utilities
+        id: packaging_krita-ci-utilities_hash
+        shell: pwsh
+        run: |
+          # Retrieve the latest commit hash from the packaging/krita-ci-utilities repository
+          $commitLine = git ls-remote https://invent.kde.org/packaging/krita-ci-utilities.git HEAD | Select-Object -First 1
+          $commit = $commitLine.Split(" ")[0]
+          echo "commit=$commit" >> $env:GITHUB_OUTPUT
+
+      - name: Cache packaging_krita-ci-utilities repository
+        id: cache_packaging_krita-ci-utilities
+        uses: actions/cache@v3
+        with:
+          path: krita-deps-management/ci-utilities
+          key: packaging_krita-ci-utilities-${{ steps.packaging_krita-ci-utilities_hash.outputs.commit }}
+
+      - name: Clone packaging_krita-ci-utilities repository
+        if: steps.cache_packaging_krita-ci-utilities.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Clone the repository if no cache is found
+          git clone https://invent.kde.org/packaging/krita-ci-utilities.git krita-deps-management/ci-utilities --depth=1
+
+      - name: Update packaging_krita-ci-utilities repository if outdated
+        if: steps.cache_packaging_krita-ci-utilities.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: |
+          # Update the cached repository if the local commit differs from the remote
+          Set-Location -Path krita-deps-management/ci-utilities
+          $local_commit = (git rev-parse HEAD).Trim()
+          $remote_commit = "${{ steps.packaging_krita-ci-utilities_hash.outputs.commit }}"
+          if ($local_commit -ne $remote_commit) {
+              Write-Output "Cached repository outdated. Fetching updates..."
+              git fetch --depth=1 origin
+              git reset --hard FETCH_HEAD
+          } else {
+              Write-Output "Repository is up-to-date."
+          }
+
+      # === sysadmin_ci-notary-service ===
+      - name: Get commit hash for sysadmin_ci-notary-service
+        id: sysadmin_ci-notary-service_hash
+        shell: pwsh
+        run: |
+          # Retrieve the latest commit hash from the sysadmin/ci-notary-service repository
+          $commitLine = git ls-remote https://invent.kde.org/sysadmin/ci-notary-service.git HEAD | Select-Object -First 1
+          $commit = $commitLine.Split(" ")[0]
+          echo "commit=$commit" >> $env:GITHUB_OUTPUT
+
+      - name: Cache sysadmin_ci-notary-service repository
+        id: cache_sysadmin_ci-notary-service
+        uses: actions/cache@v3
+        with:
+          path: ci-notary-service
+          key: sysadmin_ci-notary-service-${{ steps.sysadmin_ci-notary-service_hash.outputs.commit }}
+
+      - name: Clone sysadmin_ci-notary-service repository
+        if: steps.cache_sysadmin_ci-notary-service.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Clone the repository if no cache is found
+          git clone https://invent.kde.org/sysadmin/ci-notary-service.git --depth=1
+
+      - name: Update sysadmin_ci-notary-service repository if outdated
+        if: steps.cache_sysadmin_ci-notary-service.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: |
+          # Update the cached repository if the local commit differs from the remote
+          Set-Location -Path ci-notary-service
+          $local_commit = (git rev-parse HEAD).Trim()
+          $remote_commit = "${{ steps.sysadmin_ci-notary-service_hash.outputs.commit }}"
+          if ($local_commit -ne $remote_commit) {
+              Write-Output "Cached repository outdated. Fetching updates..."
+              git fetch --depth=1 origin
+              git reset --hard FETCH_HEAD
+          } else {
+              Write-Output "Repository is up-to-date."
+          }
+
+      # === sysadmin_upstream-ci-utilities ===
+      - name: Get commit hash for sysadmin_upstream-ci-utilities
+        id: sysadmin_upstream-ci-utilities_hash
+        shell: pwsh
+        run: |
+          # Retrieve the latest commit hash from the sysadmin/ci-utilities repository (upstream)
+          $commitLine = git ls-remote https://invent.kde.org/sysadmin/ci-utilities.git HEAD | Select-Object -First 1
+          $commit = $commitLine.Split(" ")[0]
+          echo "commit=$commit" >> $env:GITHUB_OUTPUT
+
+      - name: Cache sysadmin_upstream-ci-utilities repository
+        id: cache_sysadmin_upstream-ci-utilities
+        uses: actions/cache@v3
+        with:
+          path: upstream-ci-utilities
+          key: sysadmin_upstream-ci-utilities-${{ steps.sysadmin_upstream-ci-utilities_hash.outputs.commit }}
+
+      - name: Clone sysadmin_upstream-ci-utilities repository
+        if: steps.cache_sysadmin_upstream-ci-utilities.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Clone the repository if no cache is found
+          git clone https://invent.kde.org/sysadmin/ci-utilities.git upstream-ci-utilities --depth=1
+
+      - name: Update sysadmin_upstream-ci-utilities repository if outdated
+        if: steps.cache_sysadmin_upstream-ci-utilities.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: |
+          # Update the cached repository if the local commit differs from the remote
+          Set-Location -Path upstream-ci-utilities
+          $local_commit = (git rev-parse HEAD).Trim()
+          $remote_commit = "${{ steps.sysadmin_upstream-ci-utilities_hash.outputs.commit }}"
+          if ($local_commit -ne $remote_commit) {
+              Write-Output "Cached repository outdated. Fetching updates..."
+              git fetch --depth=1 origin
+              git reset --hard FETCH_HEAD
+          } else {
+              Write-Output "Repository is up-to-date."
+          }
 
       - name: Set up Python virtual environment
         run: |
@@ -230,8 +380,8 @@ jobs:
           pip install -r krita-deps-management/requirements.txt
           pip install -r ci-notary-service/requirements.txt
           pip install packaging
-          pip install sip sipbuild
-          pip install PyQt5
+          pip install --upgrade "sip>=4.19.13"
+          pip install --upgrade "PyQt5>= 5.6.0"
           pip install wheel
         shell: pwsh
 
