@@ -8,11 +8,11 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 200
     env:
       KDECI_BUILD_TYPE: Release
-      KDECI_CC_CACHE: C:\Gitlab\Caches\krita-windows
-      KDECI_CACHE_PATH: C:\Gitlab\Artifacts\krita-windows
+      KDECI_CC_CACHE: ${{ github.workspace }}\cache-krita-windows-cc 
+      KDECI_CACHE_PATH: ${{ github.workspace }}\cache-krita-windows-artifacts
       KDECI_GITLAB_SERVER: https://invent.kde.org/
       KDECI_PACKAGE_PROJECT: teams/ci-artifacts/krita-windows
       KDECI_REPO_METADATA_PATH: ${{ github.workspace }}\krita-deps-management\repo-metadata
@@ -48,7 +48,23 @@ jobs:
           #For pip, the action will cache the global cache directory
           #For pipenv, the action will cache virtualenv directory
           #For poetry, the action will cache virtualenv directories -- one for each poetry project found
-          #cache: 'pipenv'
+          cache: 'pip'
+
+          # Save the CC cache even if previous steps fail
+      - name: Save CC cache
+        if: always()
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.KDECI_CC_CACHE }}
+          key: ${{ runner.os }}-krita-windows-cc-test }}
+
+      # Save the Artifacts cache even if previous steps fail
+      - name: Save Artifacts cache
+        if: always()
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.KDECI_CACHE_PATH }}
+          key: ${{ runner.os }}-krita-windows-artifacts-test }}
           
       #- name: Cache Chocolatey packages
       #  uses: actions/cache@v3
@@ -190,23 +206,54 @@ jobs:
             Write-Error "vcpkg.cmake not found in: $vcpkgCMakePath"
           }
         shell: pwsh
-
         
-      - name: Install LLVM MinGW Compiler Toolchain
+      # Restore the cached LLVM toolchain (if available)
+      - name: Restore LLVM MinGW cache
+        id: restore-llvm
+        uses: actions/cache@v3
+        with:
+          path: ${{ github.workspace }}\cache-llvm-mingw
+          key: windows-llvm-mingw-20240619
+
+      # Setup LLVM MinGW Toolchain
+      - name: Setup LLVM MinGW Toolchain
         run: |
-          # load LLVM MinGW Toolchain
-          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-ucrt-x86_64.zip" -OutFile llvm-mingw.zip
-          # Extract to C:\tools\llvm-mingw
-          Expand-Archive llvm-mingw.zip -DestinationPath C:\tools\llvm-mingw -Force
-          # Add Toolchain to PATH envirment variable
+          # If the cache folder doesn't exist, download and extract the toolchain
+          if (-Not (Test-Path -Path "${env:GITHUB_WORKSPACE}\cache-llvm-mingw")) {
+            Write-Host "Cache not found. Downloading LLVM MinGW Toolchain..."
+            Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-ucrt-x86_64.zip" -OutFile llvm-mingw.zip
+            Expand-Archive llvm-mingw.zip -DestinationPath "${env:GITHUB_WORKSPACE}\cache-llvm-mingw" -Force
+          }
+          else {
+            Write-Host "Using cached LLVM MinGW Toolchain."
+          }
+          
+          # Remove any existing toolchain directory at C:\tools\llvm-mingw
+          if (Test-Path "C:\tools\llvm-mingw") {
+            Remove-Item "C:\tools\llvm-mingw" -Recurse -Force
+          }
+          
+          # Create a symlink at C:\tools\llvm-mingw that points to the cache folder
+          New-Item -ItemType SymbolicLink -Path "C:\tools\llvm-mingw" -Target "${env:GITHUB_WORKSPACE}\cache-llvm-mingw"
+          
+          # Set the LLVM toolchain path and output it to the GitHub PATH file so it is added to the environment
           $llvmPath = "C:\tools\llvm-mingw\llvm-mingw-20240619-ucrt-x86_64\bin\"
           if (Test-Path $llvmPath) {
-            Write-Host "llvm path: $llvmPath"
-          } else {
-            Write-Error "llvm path _NOT_ found: $llvmPath"
+            Write-Host "LLVM path: $llvmPath"
           }
-          Add-Content -Path $env:GITHUB_PATH -Value "$llvmPath"
+          else {
+            Write-Error "LLVM path not found: $llvmPath"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $llvmPath
         shell: pwsh
+
+      # Save (update) the LLVM toolchain cache even if previous steps fail.
+      - name: Save LLVM MinGW cache
+        if: always()
+        uses: actions/cache@v3
+        with:
+          path: ${{ github.workspace }}\cache-llvm-mingw
+          key: windows-llvm-mingw-20240619
         
       # === packaging_krita-deps-management ===
       - name: Get commit hash for packaging_krita-deps-management
@@ -428,10 +475,10 @@ jobs:
         run: dir
         shell: pwsh
         
-      - name: Zip Logs
-        run: |
-          Compress-Archive -Path build-krita.log,build-installers.log -DestinationPath log.zip
-        shell: pwsh
+      #- name: Zip Logs
+      #  run: |
+      #    Compress-Archive -Path build-krita.log,build-installers.log -DestinationPath log.zip
+      #  shell: pwsh
 
       #- name: Upload Logs as ZIP Artifact
       #  uses: actions/upload-artifact@v3
@@ -441,19 +488,44 @@ jobs:
       #      log.zip
       #    retention-days: 1
 
-      - name: Check vcpkg Cache Size
-        run: |
-          $cachePath = "$env:VCPKG_INSTALLATION_ROOT\installed"
-          if (Test-Path $cachePath) {
-              $size = (Get-ChildItem -Path $cachePath -Recurse | Measure-Object -Property Length -Sum).Sum / 1GB
-              Write-Host "Cache-Size: $size GB"
-              
-              if ($size -gt 7) {
-                  Write-Host "warning cache bigger then 7gb aboard of workflow"
-                  #maybe at some time. curl -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/<owner>/<repo>/actions/caches/<cache_id>"
-                  exit 1
-              }
-          } else {
-              Write-Host "Fehler: Cache path dont exist"
-          }
+      #- name: Check vcpkg Cache Size
+      #  run: |
+      #    $cachePath = "$env:VCPKG_INSTALLATION_ROOT\installed"
+      #    if (Test-Path $cachePath) {
+      #        $size = (Get-ChildItem -Path $cachePath -Recurse | Measure-Object -Property Length -Sum).Sum / 1GB
+      #        Write-Host "Cache-Size: $size GB"
+      #        
+      #        if ($size -gt 7) {
+      #            Write-Host "warning cache bigger then 7gb aboard of workflow"
+      #            #maybe at some time. curl -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/<owner>/<repo>/actions/caches/<cache_id>"
+      #            exit 1
+      #        }
+      #    } else {
+      #        Write-Host "Fehler: Cache path dont exist"
+      #    }
+      #  shell: pwsh
+      - name: Show size of KDECI_CC_CACHE folder
         shell: pwsh
+        run: |
+          $folderPath = $env:KDECI_CC_CACHE
+          if (Test-Path $folderPath) {
+            $sizeBytes = (Get-ChildItem $folderPath -Recurse | Measure-Object -Property Length -Sum).Sum
+            $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
+            Write-Output "Size of KDECI_CC_CACHE: $sizeMB MB ($sizeBytes bytes)"
+          }
+          else {
+            Write-Output "Folder '$folderPath' does not exist."
+          }
+      
+      - name: Show size of KDECI_CACHE_PATH folder
+        shell: pwsh
+        run: |
+          $folderPath = $env:KDECI_CACHE_PATH
+          if (Test-Path $folderPath) {
+            $sizeBytes = (Get-ChildItem $folderPath -Recurse | Measure-Object -Property Length -Sum).Sum
+            $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
+            Write-Output "Size of KDECI_CACHE_PATH: $sizeMB MB ($sizeBytes bytes)"
+          }
+          else {
+            Write-Output "Folder '$folderPath' does not exist."
+          }
