@@ -11,8 +11,8 @@ jobs:
     timeout-minutes: 90
     env:
       KDECI_BUILD_TYPE: Release
-      KDECI_CC_CACHE: C:\Gitlab\Caches\krita-windows
-      KDECI_CACHE_PATH: C:\Gitlab\Artifacts\krita-windows
+      KDECI_CC_CACHE: ${{ github.workspace }}\cache-krita-windows-cc 
+      KDECI_CACHE_PATH: ${{ github.workspace }}\cache-krita-windows-artifacts-cc
       KDECI_GITLAB_SERVER: https://invent.kde.org/
       KDECI_PACKAGE_PROJECT: teams/ci-artifacts/krita-windows
       KDECI_REPO_METADATA_PATH: ${{ github.workspace }}\krita-deps-management\repo-metadata
@@ -48,7 +48,23 @@ jobs:
           #For pip, the action will cache the global cache directory
           #For pipenv, the action will cache virtualenv directory
           #For poetry, the action will cache virtualenv directories -- one for each poetry project found
-          #cache: 'pipenv'
+          cache: 'pip'
+
+          # Save the CC cache even if previous steps fail
+      - name: Save CC cache
+        if: always()
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.KDECI_CC_CACHE }}
+          key: ${{ runner.os }}-krita-windows-cc-test }}
+
+      # Save the Artifacts cache even if previous steps fail
+      - name: Save Artifacts cache
+        if: always()
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.KDECI_CACHE_PATH }}
+          key: ${{ runner.os }}-krita-windows-artifacts-test }}
           
       #- name: Cache Chocolatey packages
       #  uses: actions/cache@v3
@@ -189,4 +205,218 @@ jobs:
           else {
             Write-Error "vcpkg.cmake not found in: $vcpkgCMakePath"
           }
+        shell: pwsh
+
+        
+      - name: Install LLVM MinGW Compiler Toolchain
+        run: |
+          # load LLVM MinGW Toolchain
+          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-ucrt-x86_64.zip" -OutFile llvm-mingw.zip
+          # Extract to C:\tools\llvm-mingw
+          Expand-Archive llvm-mingw.zip -DestinationPath C:\tools\llvm-mingw -Force
+          # Add Toolchain to PATH envirment variable
+          $llvmPath = "C:\tools\llvm-mingw\llvm-mingw-20240619-ucrt-x86_64\bin\"
+          if (Test-Path $llvmPath) {
+            Write-Host "llvm path: $llvmPath"
+          } else {
+            Write-Error "llvm path _NOT_ found: $llvmPath"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value "$llvmPath"
+        shell: pwsh
+        
+      # === packaging_krita-deps-management ===
+      - name: Get commit hash for packaging_krita-deps-management
+        id: packaging_krita-deps-management_hash
+        shell: pwsh
+        run: |
+          # Retrieve the latest commit hash from the packaging/krita-deps-management repository
+          $commitLine = git ls-remote https://invent.kde.org/packaging/krita-deps-management.git $env:EFFECTIVE_DEPS_REPO_BRANCH_NAME | Select-Object -First 1
+          $commit = $commitLine.Split(" ")[0]
+          echo "commit=$commit" >> $env:GITHUB_OUTPUT
+
+      - name: Cache packaging_krita-deps-management repository
+        id: cache_packaging_krita-deps-management
+        uses: actions/cache@v3
+        with:
+          path: krita-deps-management
+          key: packaging_krita-deps-management-${{ env.EFFECTIVE_DEPS_REPO_BRANCH_NAME }}-${{ steps.packaging_krita-deps-management_hash.outputs.commit }}
+
+      - name: Clone packaging_krita-deps-management repository
+        if: steps.cache_packaging_krita-deps-management.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Clone the repository if no cache is found
+          git clone https://invent.kde.org/packaging/krita-deps-management.git -b $env:EFFECTIVE_DEPS_REPO_BRANCH_NAME --depth=1
+
+      - name: Update packaging_krita-deps-management repository if outdated
+        if: steps.cache_packaging_krita-deps-management.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: |
+          # Update the cached repository if the local commit differs from the remote
+          Set-Location -Path krita-deps-management
+          $local_commit = (git rev-parse HEAD).Trim()
+          $remote_commit = "${{ steps.packaging_krita-deps-management_hash.outputs.commit }}"
+          if ($local_commit -ne $remote_commit) {
+              Write-Output "Cached repository outdated. Fetching updates..."
+              git fetch --depth=1 origin $env:EFFECTIVE_DEPS_REPO_BRANCH_NAME
+              git reset --hard FETCH_HEAD
+          } else {
+              Write-Output "Repository is up-to-date."
+          }
+
+      # === packaging_krita-ci-utilities (located under krita-deps-management/ci-utilities) ===
+      - name: Get commit hash for packaging_krita-ci-utilities
+        id: packaging_krita-ci-utilities_hash
+        shell: pwsh
+        run: |
+          # Retrieve the latest commit hash from the packaging/krita-ci-utilities repository
+          $commitLine = git ls-remote https://invent.kde.org/packaging/krita-ci-utilities.git HEAD | Select-Object -First 1
+          $commit = $commitLine.Split(" ")[0]
+          echo "commit=$commit" >> $env:GITHUB_OUTPUT
+
+      - name: Cache packaging_krita-ci-utilities repository
+        id: cache_packaging_krita-ci-utilities
+        uses: actions/cache@v3
+        with:
+          path: krita-deps-management/ci-utilities
+          key: packaging_krita-ci-utilities-${{ steps.packaging_krita-ci-utilities_hash.outputs.commit }}
+
+      - name: Clone packaging_krita-ci-utilities repository
+        if: steps.cache_packaging_krita-ci-utilities.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Clone the repository if no cache is found
+          git clone https://invent.kde.org/packaging/krita-ci-utilities.git krita-deps-management/ci-utilities --depth=1
+
+      - name: Update packaging_krita-ci-utilities repository if outdated
+        if: steps.cache_packaging_krita-ci-utilities.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: |
+          # Update the cached repository if the local commit differs from the remote
+          Set-Location -Path krita-deps-management/ci-utilities
+          $local_commit = (git rev-parse HEAD).Trim()
+          $remote_commit = "${{ steps.packaging_krita-ci-utilities_hash.outputs.commit }}"
+          if ($local_commit -ne $remote_commit) {
+              Write-Output "Cached repository outdated. Fetching updates..."
+              git fetch --depth=1 origin
+              git reset --hard FETCH_HEAD
+          } else {
+              Write-Output "Repository is up-to-date."
+          }
+
+      # === sysadmin_ci-notary-service ===
+      - name: Get commit hash for sysadmin_ci-notary-service
+        id: sysadmin_ci-notary-service_hash
+        shell: pwsh
+        run: |
+          # Retrieve the latest commit hash from the sysadmin/ci-notary-service repository
+          $commitLine = git ls-remote https://invent.kde.org/sysadmin/ci-notary-service.git HEAD | Select-Object -First 1
+          $commit = $commitLine.Split(" ")[0]
+          echo "commit=$commit" >> $env:GITHUB_OUTPUT
+
+      - name: Cache sysadmin_ci-notary-service repository
+        id: cache_sysadmin_ci-notary-service
+        uses: actions/cache@v3
+        with:
+          path: ci-notary-service
+          key: sysadmin_ci-notary-service-${{ steps.sysadmin_ci-notary-service_hash.outputs.commit }}
+
+      - name: Clone sysadmin_ci-notary-service repository
+        if: steps.cache_sysadmin_ci-notary-service.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Clone the repository if no cache is found
+          git clone https://invent.kde.org/sysadmin/ci-notary-service.git --depth=1
+
+      - name: Update sysadmin_ci-notary-service repository if outdated
+        if: steps.cache_sysadmin_ci-notary-service.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: |
+          # Update the cached repository if the local commit differs from the remote
+          Set-Location -Path ci-notary-service
+          $local_commit = (git rev-parse HEAD).Trim()
+          $remote_commit = "${{ steps.sysadmin_ci-notary-service_hash.outputs.commit }}"
+          if ($local_commit -ne $remote_commit) {
+              Write-Output "Cached repository outdated. Fetching updates..."
+              git fetch --depth=1 origin
+              git reset --hard FETCH_HEAD
+          } else {
+              Write-Output "Repository is up-to-date."
+          }
+
+      # === sysadmin_upstream-ci-utilities ===
+      - name: Get commit hash for sysadmin_upstream-ci-utilities
+        id: sysadmin_upstream-ci-utilities_hash
+        shell: pwsh
+        run: |
+          # Retrieve the latest commit hash from the sysadmin/ci-utilities repository (upstream)
+          $commitLine = git ls-remote https://invent.kde.org/sysadmin/ci-utilities.git HEAD | Select-Object -First 1
+          $commit = $commitLine.Split(" ")[0]
+          echo "commit=$commit" >> $env:GITHUB_OUTPUT
+
+      - name: Cache sysadmin_upstream-ci-utilities repository
+        id: cache_sysadmin_upstream-ci-utilities
+        uses: actions/cache@v3
+        with:
+          path: upstream-ci-utilities
+          key: sysadmin_upstream-ci-utilities-${{ steps.sysadmin_upstream-ci-utilities_hash.outputs.commit }}
+
+      - name: Clone sysadmin_upstream-ci-utilities repository
+        if: steps.cache_sysadmin_upstream-ci-utilities.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Clone the repository if no cache is found
+          git clone https://invent.kde.org/sysadmin/ci-utilities.git upstream-ci-utilities --depth=1
+
+      - name: Update sysadmin_upstream-ci-utilities repository if outdated
+        if: steps.cache_sysadmin_upstream-ci-utilities.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: |
+          # Update the cached repository if the local commit differs from the remote
+          Set-Location -Path upstream-ci-utilities
+          $local_commit = (git rev-parse HEAD).Trim()
+          $remote_commit = "${{ steps.sysadmin_upstream-ci-utilities_hash.outputs.commit }}"
+          if ($local_commit -ne $remote_commit) {
+              Write-Output "Cached repository outdated. Fetching updates..."
+              git fetch --depth=1 origin
+              git reset --hard FETCH_HEAD
+          } else {
+              Write-Output "Repository is up-to-date."
+          }
+
+      - name: Set up Python virtual environment
+        run: |
+          python -m venv venv --upgrade-deps
+          .\venv\Scripts\Activate.ps1
+        shell: pwsh
+        
+      - name: Install Python Dependencies
+        run: |
+          .\venv\Scripts\Activate.ps1
+          pip install -r krita-deps-management/requirements.txt
+          pip install -r ci-notary-service/requirements.txt
+          pip install packaging
+          pip install --upgrade "sip>=4.19.13"
+          pip install --upgrade "PyQt5>= 5.6.0"
+          pip install wheel
+        shell: pwsh
+
+      #- name: Configure Git safe directory #dont think its needed for github autobuild 
+      #  run: git config --global --add safe.directory $env:CI_PROJECT_DIR
+      #  shell: pwsh
+
+      - name: Replace Branch in Seed File
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python -u krita-deps-management/tools/replace-branch-in-seed-file.py krita-deps-management/latest/krita-deps.yml -p -o branch-corrected-deps.yml -d $env:EFFECTIVE_DEPS_BRANCH_NAME
+        shell: pwsh
+
+      - name: Generate Deps File
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python -u krita-deps-management/tools/generate-deps-file.py -s branch-corrected-deps.yml -o .kde-ci.yml
+        shell: pwsh
+
+      - name: List .\venv\Lib\site-packages\
+        run: dir .\venv\Lib\site-packages\
         shell: pwsh
