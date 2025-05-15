@@ -232,6 +232,7 @@ jobs:
           pip install packaging
           pip install sip sipbuild
           pip install PyQt5
+          pip install wheel
         shell: pwsh
 
       #- name: Configure Git safe directory #dont think its needed for github autobuild 
@@ -250,12 +251,17 @@ jobs:
           python -u krita-deps-management/tools/generate-deps-file.py -s branch-corrected-deps.yml -o .kde-ci.yml
         shell: pwsh
 
+      - name: List .\venv\Lib\site-packages\
+        run: dir .\venv\Lib\site-packages\
+        shell: pwsh
+        
       - name: Run Krita CI Build
         run: |
           .\venv\Scripts\Activate.ps1
           python -u krita-deps-management/ci-utilities/run-ci-build.py --project $env:CI_PROJECT_NAME --branch $env:CI_COMMIT_REF_NAME --platform "Windows/Qt5/Shared" --skip-publishing 2>&1 | Tee-Object -FilePath "build-krita.log"
         shell: pwsh
-
+        
+        
       - name: Build Windows Package
         run: |
           .\venv\Scripts\Activate.ps1
