@@ -1,4 +1,4 @@
-name: build env Windows
+name: build Windows
 
 permissions:
   contents: read
@@ -6,7 +6,7 @@ permissions:
 on:
   workflow_dispatch:  # Triger manual
 jobs:
-  build-env-windows:
+  build-windows:
     runs-on: windows-latest
     timeout-minutes: 90
     env:
