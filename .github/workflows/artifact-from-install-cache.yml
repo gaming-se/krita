@@ -25,7 +25,7 @@ jobs:
       - name: Cache wiederherstellen
         uses: actions/cache@v3
         with:
-          # Der Schlüssel kombiniert das Betriebssystem und den vom Benutzer eingegebenen Wert.
+          path: _install
           key: krita-${{ github.event.inputs.cache_os }}-install-${{ github.event.inputs.runer_id_version }}
           restore-keys: |
             krita-${{ github.event.inputs.cache_os }}-install-
