@@ -1,0 +1,43 @@
+name: Create artifact from install cache 
+
+on:
+  workflow_dispatch:
+    inputs:
+      cache_os:
+        description: "os"
+        required: true
+        type: choice
+        options:
+          - Windows
+        default: ubuntu-latest
+      runer_id_version:
+        description: "RunerId of Cache"
+        required: true
+        default: "1"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v3
+
+      - name: Cache wiederherstellen
+        uses: actions/cache@v3
+        with:
+          # Der Schlüssel kombiniert das Betriebssystem und den vom Benutzer eingegebenen Wert.
+          key: krita-${{ github.event.inputs.cache_os }}-install-${{ github.event.inputs.runer_id_version }}
+          restore-keys: |
+            krita-${{ github.event.inputs.cache_os }}-install-
+        #XZ_OPT=-9 tar -cJvf _install.tar.xz _install
+        #tar -czvf _install.tar.gz _install
+      - name: tar _install folder
+        run: |
+          XZ_OPT=-9 tar -cJvf _install.tar.xz _install
+          
+      - name: uploadArtefact
+        uses: actions/upload-artifact@v3
+        with:
+          name: krita-install-cache
+          path: _install.tar.xz
+          retention-days: 1
