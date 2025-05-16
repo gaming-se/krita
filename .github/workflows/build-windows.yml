@@ -35,7 +35,9 @@ jobs:
         with:
           # deactivates persist of GitHub-Token in git-conf
           persist-credentials: false
-          
+      - name: Print Runner ID
+        run: echo "Runner ID ${{ runner.id }}"
+  
       - name: List current directory files
         run: dir
         shell: pwsh
@@ -457,13 +459,102 @@ jobs:
           .\venv\Scripts\Activate.ps1
           python -u krita-deps-management/ci-utilities/run-ci-build.py --project $env:CI_PROJECT_NAME --branch $env:CI_COMMIT_REF_NAME --platform "Windows/Qt5/Shared" --skip-publishing 2>&1 | Tee-Object -FilePath "build-krita.log"
         shell: pwsh
-        
-        
-      - name: Build Windows Package
-        run: |
-          .\venv\Scripts\Activate.ps1
-          python -u build-tools/ci-scripts/build-windows-package.py 2>&1 | Tee-Object -FilePath "build-installers.log"
+
+      - name: List current directory files
+        run: dir
         shell: pwsh
+
+      - name: Show size of KDECI_CC_CACHE folder
+        shell: pwsh
+        run: |
+          $folderPath = $env:KDECI_CC_CACHE
+          if (Test-Path $folderPath) {
+            $sizeBytes = (Get-ChildItem $folderPath -Recurse | Measure-Object -Property Length -Sum).Sum
+            $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
+            Write-Output "Size of KDECI_CC_CACHE: $sizeMB MB ($sizeBytes bytes)"
+          }
+          else {
+            Write-Output "Folder '$folderPath' does not exist."
+          }
+      
+      - name: Show size of KDECI_CACHE_PATH folder
+        shell: pwsh
+        run: |
+          $folderPath = $env:KDECI_CACHE_PATH
+          if (Test-Path $folderPath) {
+            $sizeBytes = (Get-ChildItem $folderPath -Recurse | Measure-Object -Property Length -Sum).Sum
+            $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
+            Write-Output "Size of KDECI_CACHE_PATH: $sizeMB MB ($sizeBytes bytes)"
+          }
+          else {
+            Write-Output "Folder '$folderPath' does not exist."
+          }
+          
+      - name: Calculate folder sizes
+        id: calculate_size
+        shell: pwsh
+        run: |
+          $installSize = 0
+          $buildSize = 0
+          $stagingSize = 0
+          
+          if (Test-Path "_install") {
+              $installSize = (Get-ChildItem -Path "_install" -Recurse | Measure-Object -Property Length -Sum).Sum / 1GB
+          }
+          
+          if (Test-Path "_build") {
+              $buildSize = (Get-ChildItem -Path "_build" -Recurse | Measure-Object -Property Length -Sum).Sum / 1GB
+          }
+          
+          if (Test-Path "_staging") {
+              $stagingSize = (Get-ChildItem -Path "_staging" -Recurse | Measure-Object -Property Length -Sum).Sum / 1GB
+          }
+          $totalSize = $installSize + $buildSize + $stagingSize
+
+          echo "INSTALL_SIZE=$installSize" >> $env:GITHUB_OUTPUT
+          echo "BUILD_SIZE=$buildSize" >> $env:GITHUB_OUTPUT
+          echo "STAGING_SIZE=$stagingSize" >> $env:GITHUB_OUTPUT
+          echo "TOTAL_SIZE=$totalSize" >> $env:GITHUB_OUTPUT
+
+      - name: Debug Show folder sizes
+        run: |
+          echo "Install Size: ${{ steps.calculate_size.outputs.INSTALL_SIZE }} GB"
+          echo "Build Size: ${{ steps.calculate_size.outputs.BUILD_SIZE }} GB"
+          echo "Staging Size: ${{ steps.calculate_size.outputs.STAGING_SIZE }} GB"
+          echo "Total Size: ${{ steps.calculate_size.outputs.TOTAL_SIZE }} GB"
+
+      - name: Cache _install folder (if total size < 7GB)
+        if: ${{ steps.calculate_size.outputs.TOTAL_SIZE < 7 }}
+        uses: actions/cache@v3
+        with:
+          path: _install
+          key: krita-${{ runner.os }}-install-${{ github.run_id }}
+          restore-keys: |
+            krita-${{ runner.os }}-install-
+
+      - name: Cache _build folder (if total size < 7GB)
+        if: ${{ steps.calculate_size.outputs.TOTAL_SIZE < 7 }}
+        uses: actions/cache@v3
+        with:
+          path: _build
+          key: krita-${{ runner.os }}-build-${{ github.run_id }}
+          restore-keys: |
+            krita-${{ runner.os }}-build-
+
+      - name: Cache _staging folder (if total size < 7GB OR staging < 7GB)
+        if: ${{ steps.calculate_size.outputs.TOTAL_SIZE < 7 || steps.calculate_size.outputs.STAGING_SIZE < 7 }}
+        uses: actions/cache@v3
+        with:
+          path: _staging
+          key: krita-${{ runner.os }}-staging-${{ github.run_id }}
+          restore-keys: |
+            krita-${{ runner.os }}-staging-
+        
+      #- name: Build Windows Package
+      #  run: |
+      #    .\venv\Scripts\Activate.ps1
+      #    python -u build-tools/ci-scripts/build-windows-package.py 2>&1 | Tee-Object -FilePath "build-installers.log"
+      #  shell: pwsh
       
       #- name: Upload Nightly Packages
       #  run: |
@@ -471,9 +562,6 @@ jobs:
       #    python -u build-tools/ci-scripts/upload-nightly-packages.py --platform windows --folder $env:CI_PROJECT_DIR 2>&1 | Tee-Object -FilePath "installers-publish.log"
       #  shell: pwsh
       
-      - name: List current directory files
-        run: dir
-        shell: pwsh
         
       #- name: Zip Logs
       #  run: |
@@ -504,28 +592,4 @@ jobs:
       #        Write-Host "Fehler: Cache path dont exist"
       #    }
       #  shell: pwsh
-      - name: Show size of KDECI_CC_CACHE folder
-        shell: pwsh
-        run: |
-          $folderPath = $env:KDECI_CC_CACHE
-          if (Test-Path $folderPath) {
-            $sizeBytes = (Get-ChildItem $folderPath -Recurse | Measure-Object -Property Length -Sum).Sum
-            $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
-            Write-Output "Size of KDECI_CC_CACHE: $sizeMB MB ($sizeBytes bytes)"
-          }
-          else {
-            Write-Output "Folder '$folderPath' does not exist."
-          }
-      
-      - name: Show size of KDECI_CACHE_PATH folder
-        shell: pwsh
-        run: |
-          $folderPath = $env:KDECI_CACHE_PATH
-          if (Test-Path $folderPath) {
-            $sizeBytes = (Get-ChildItem $folderPath -Recurse | Measure-Object -Property Length -Sum).Sum
-            $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
-            Write-Output "Size of KDECI_CACHE_PATH: $sizeMB MB ($sizeBytes bytes)"
-          }
-          else {
-            Write-Output "Folder '$folderPath' does not exist."
-          }
+
