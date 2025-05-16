@@ -1,43 +1,42 @@
-name: Create artifact from install cache 
+name: Create artifact from install cache
 
 on:
   workflow_dispatch:
     inputs:
-      cache_os:
-        description: "RunerOS of Cache"
-        required: true
-        type: choice
-        options:
-          - Windows
-        default: Windows
-      runer_id_version:
-        description: "RunerId of Cache"
+      runner_id_version:
+        description: "Cache Runner ID Version"
         required: true
         default: "1"
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
-      - name: Repository auschecken
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Cache wiederherstellen
+      - name: Restore Cache
         uses: actions/cache@v3
         with:
           path: _install
-          key: krita-${{ github.event.inputs.cache_os }}-install-${{ github.event.inputs.runer_id_version }}
+          key: krita-Windows-install-${{ github.event.inputs.runner_id_version }}
           restore-keys: |
-            krita-${{ github.event.inputs.cache_os }}-install-
-        #XZ_OPT=-9 tar -cJvf _install.tar.xz _install
-        #tar -czvf _install.tar.gz _install
-      - name: tar _install folder
+            krita-Windows-install-
+
+      - name: Create _install directory and add a sample file (if not exists)
         run: |
-          XZ_OPT=-9 tar -cJvf _install.tar.xz _install
-          
-      - name: Upload Artefact
+          if not exist _install (
+            mkdir _install
+          )
+          echo Sample data > _install\sample.txt
+
+      - name: Compress _install folder with 7-Zip
+        run: |
+          "C:\Program Files\7-Zip\7z.exe" a -mx=9 _install.7z _install\
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: krita-install-cache
-          path: _install.tar.xz
+          path: _install.7z
           retention-days: 1
