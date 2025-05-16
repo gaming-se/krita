@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       cache_os:
-        description: "os"
+        description: "RunerOS of Cache"
         required: true
         type: choice
         options:
           - Windows
-        default: ubuntu-latest
+        default: Windows
       runer_id_version:
         description: "RunerId of Cache"
         required: true
@@ -35,8 +35,8 @@ jobs:
         run: |
           XZ_OPT=-9 tar -cJvf _install.tar.xz _install
           
-      - name: uploadArtefact
-        uses: actions/upload-artifact@v3
+      - name: Upload Artefact
+        uses: actions/upload-artifact@v4
         with:
           name: krita-install-cache
           path: _install.tar.xz
