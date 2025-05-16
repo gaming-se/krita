@@ -24,8 +24,9 @@ jobs:
             krita-Windows-install-
 
       - name: Compress _install folder with 7-Zip
+        shell: pwsh
         run: |
-          "C:\Program Files\7-Zip\7z.exe" a -mx=9 _install.7z _install\
+          & "C:\Program Files\7-Zip\7z.exe" a -mx=9 _install.7z _install\
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
